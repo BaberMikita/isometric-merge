@@ -19,10 +19,10 @@
 
 <body>
     <script>
-        const TILE_W = 100;
-        const TILE_H = 50;
+        const TILE_W = 140;
+        const TILE_H = 70;
         const OFFSET_X = 300;
-        const OFFSET_Y = 200;
+        const OFFSET_Y = 160;
 
         const config = {
             type: Phaser.AUTO,
@@ -48,20 +48,20 @@
             const gridSize = 3;
 
             // --- Score UI ---
-            const scoreCardX = 300, scoreCardY = 390;
+            const scoreCardX = 300, scoreCardY = 460;
             const scoreBg = this.add.graphics();
             scoreBg.fillStyle(0x000000, 0.35);
-            scoreBg.fillRoundedRect(scoreCardX - 110, scoreCardY - 30, 220, 60, 14);
-            scoreBg.lineStyle(1.5, 0x5da8ff, 0.4);
-            scoreBg.strokeRoundedRect(scoreCardX - 110, scoreCardY - 30, 220, 60, 14);
+            scoreBg.fillRoundedRect(scoreCardX - 130, scoreCardY - 36, 260, 72, 18);
+            scoreBg.lineStyle(2, 0x5da8ff, 0.5);
+            scoreBg.strokeRoundedRect(scoreCardX - 130, scoreCardY - 36, 260, 72, 18);
 
-            this.add.text(scoreCardX, scoreCardY - 14, 'SCORE', {
-                fontSize: '11px', fontStyle: 'bold', color: '#5da8ff',
-                letterSpacing: 3
+            this.add.text(scoreCardX, scoreCardY - 16, 'SCORE', {
+                fontSize: '14px', fontStyle: 'bold', color: '#5da8ff',
+                letterSpacing: 4
             }).setOrigin(0.5);
 
-            this.scoreText = this.add.text(scoreCardX, scoreCardY + 10, '0', {
-                fontSize: '26px', fontStyle: 'bold', color: '#ffffff',
+            this.scoreText = this.add.text(scoreCardX, scoreCardY + 14, '0', {
+                fontSize: '34px', fontStyle: 'bold', color: '#ffffff',
                 shadow: { offsetX: 0, offsetY: 2, color: '#5da8ff', blur: 8, fill: true }
             }).setOrigin(0.5);
 
@@ -94,8 +94,8 @@
             spawnItem(this, 2, 0, 2); // Уровень 2
 
             // 3. Кнопка «Добавить здание»
-            const btnW = 200, btnH = 56;
-            const btnX = 300, btnY = 530;
+            const btnW = 270, btnH = 72;
+            const btnX = 300, btnY = 580;
 
             const btnBg = this.add.graphics();
             function drawBtn(pressed) {
@@ -120,7 +120,7 @@
             btnOverlay.setAlpha(0);
 
             const btnText = this.add.text(btnX, btnY, '+ Добавить здание', {
-                fontSize: '18px',
+                fontSize: '22px',
                 fontStyle: 'bold',
                 color: '#ffffff',
                 stroke: '#1a5fa8',
@@ -214,7 +214,7 @@
             const color = palette[(level - 1) % palette.length];
 
             // Создаем "квадрат", который будет выступать предметом
-            const item = scene.add.rectangle(pos.x, pos.y - 15, 40, 40, color).setInteractive({ draggable: true });
+            const item = scene.add.rectangle(pos.x, pos.y - 22, 62, 62, color).setInteractive({ draggable: true });
             item.gridX = gridX;
             item.gridY = gridY;
             item.level = level;
@@ -224,8 +224,8 @@
 
             // Текст значения (2^level)
             const value = Math.pow(2, level);
-            item.textObj = scene.add.text(pos.x, pos.y - 15, value, {
-                fontSize: value >= 1000 ? '14px' : '20px',
+            item.textObj = scene.add.text(pos.x, pos.y - 22, value, {
+                fontSize: value >= 1000 ? '16px' : '24px',
                 fontStyle: 'bold',
                 color: '#ffffff',
                 stroke: '#000000',
@@ -237,6 +237,7 @@
                 item.textObj.x = item.x;
                 item.textObj.y = item.y;
                 item.textObj.setDepth(1001);
+                item.setDepth(1000);
             });
 
             scene.grid[gridX][gridY] = { empty: false, item: item };
@@ -252,8 +253,8 @@
             scene.grid[gridX][gridY] = { empty: false, item: item }; // Занимаем новую
 
             const pos = getIsoPos(gridX, gridY);
-            item.setPosition(pos.x, pos.y - 15);
-            item.textObj.setPosition(pos.x, pos.y - 15);
+            item.setPosition(pos.x, pos.y - 22);
+            item.textObj.setPosition(pos.x, pos.y - 22);
 
             item.setDepth(gridX + gridY);
             item.textObj.setDepth(gridX + gridY + 1);
@@ -286,8 +287,8 @@
 
             // Анимация +N
             const pos = getIsoPos(gridX, gridY);
-            const plusText = scene.add.text(pos.x, pos.y - 40, '+' + mergeValue, {
-                fontSize: '20px', fontStyle: 'bold', color: '#f9e44a',
+            const plusText = scene.add.text(pos.x, pos.y - 55, '+' + mergeValue, {
+                fontSize: '26px', fontStyle: 'bold', color: '#f9e44a',
                 stroke: '#000', strokeThickness: 3
             }).setOrigin(0.5).setDepth(2000);
             scene.tweens.add({
@@ -300,8 +301,8 @@
 
         function returnToOrigin(item) {
             const pos = getIsoPos(item.gridX, item.gridY);
-            item.setPosition(pos.x, pos.y - 15);
-            item.textObj.setPosition(pos.x, pos.y - 15);
+            item.setPosition(pos.x, pos.y - 22);
+            item.textObj.setPosition(pos.x, pos.y - 22);
             item.setDepth(item.gridX + item.gridY);
             item.textObj.setDepth(item.gridX + item.gridY + 1);
         }
