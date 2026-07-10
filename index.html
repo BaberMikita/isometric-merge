@@ -259,10 +259,17 @@
                 });
 
             // 5. Глобальный слушатель Drag & Drop
-            this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
-                gameObject.x = dragX;
-                gameObject.y = dragY;
+            this.input.on('dragstart', (pointer, gameObject) => {
+                // Сразу центрируем объект по пальцу при касании
+                gameObject.x = pointer.x;
+                gameObject.y = pointer.y;
                 gameObject.setDepth(1000);
+            });
+
+            this.input.on('drag', (pointer, gameObject) => {
+                // Привязываем центр объекта строго к координатам пальца
+                gameObject.x = pointer.x;
+                gameObject.y = pointer.y;
             });
 
             this.input.on('dragend', (pointer, gameObject) => {
