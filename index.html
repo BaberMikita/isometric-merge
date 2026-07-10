@@ -45,6 +45,7 @@
         function create() {
             this.grid = [];
             this.gameOver = false;
+            this.gameStarted = false;
             this.bestValue = 2;
             const gridSize = 3;
             this.gridSize = gridSize;
@@ -176,43 +177,86 @@
                 }
             });
 
-            // 4. Таймер: авто-спавн каждые 3.5 секунд
-            const SPAWN_DELAY = 3500;
-            const barX = 50, barY = 660, barW = 500, barH = 14;
+            // 4. Таймер: поражение при истечении (7 секунд)
+            const SPAWN_DELAY = 7000;
+            const barX = 50, barY = 660, barW = 500, barH = 16;
 
             // Фон полосы
             const barBg = this.add.graphics();
             barBg.fillStyle(0x2a2a35, 1);
-            barBg.fillRoundedRect(barX, barY, barW, barH, 7);
-            this.add.text(300, barY - 22, 'Новое здание через:', {
-                fontSize: '14px', color: '#888', fontStyle: 'bold'
+            barBg.fillRoundedRect(barX, barY, barW, barH, 8);
+            this.add.text(300, barY - 24, 'Объедини здания до конца таймера!', {
+                fontSize: '14px', color: '#aaaaaa', fontStyle: 'bold'
             }).setOrigin(0.5);
 
-            // Заполняющаяся полоса
+            // Заполняющаяся полоса (убывает справа налево)
             this.timerFill = this.add.graphics();
             this.timerElapsed = 0;
 
-            // Сброс таймера (вызывается после слияния)
+            // Сброс таймера после слияния
             this.startTimer = () => { this.timerElapsed = 0; };
 
-            // Обновление каждые 50мс — надёжный подход вместо tween
             this.time.addEvent({
-                delay: 50,
-                loop: true,
-                callback: () => {
-                    if (this.gameOver) return;
+                delay: 50, loop: true,
+                callbackScope: this,
+                callback: function() {
+                    if (!this.gameStarted || this.gameOver) return;
                     this.timerElapsed += 50;
-                    const v = Math.min(this.timerElapsed / SPAWN_DELAY, 1);
+                    const v = 1 - Math.min(this.timerElapsed / SPAWN_DELAY, 1); // убывает
                     this.timerFill.clear();
-                    const color = v > 0.75 ? 0xe06c75 : (v > 0.45 ? 0xe5c07b : 0x98c379);
+                    const color = v < 0.25 ? 0xe06c75 : (v < 0.55 ? 0xe5c07b : 0x98c379);
                     this.timerFill.fillStyle(color, 1);
-                    this.timerFill.fillRoundedRect(barX, barY, barW * v, barH, 7);
+                    this.timerFill.fillRoundedRect(barX, barY, barW * v, barH, 8);
                     if (this.timerElapsed >= SPAWN_DELAY) {
                         this.timerElapsed = 0;
-                        autoSpawn(this);
+                        showLose(this);
                     }
                 }
             });
+
+            // 5. TAP TO PLAY — экран правил
+            const ov = this.add.graphics().setDepth(5000);
+            ov.fillStyle(0x0d0d1a, 0.95);
+            ov.fillRect(0, 0, 600, 800);
+
+            this.add.text(300, 120, '🏗️', { fontSize: '72px' }).setOrigin(0.5).setDepth(5001);
+            this.add.text(300, 210, 'ISOMETRIC MERGE', {
+                fontSize: '32px', fontStyle: 'bold', color: '#f9e44a',
+                stroke: '#000', strokeThickness: 4
+            }).setOrigin(0.5).setDepth(5001);
+
+            const rules = [
+                '↔  Перетаскивай одинаковые здания',
+                '     чтобы объединить их',
+                '⏱  Успей объединить до конца таймера',
+                '🏆  Цель — собери здание 32',
+                '➕  Кнопка добавляет новое здание'
+            ];
+            rules.forEach((line, i) => {
+                this.add.text(300, 310 + i * 44, line, {
+                    fontSize: '18px', color: '#cccccc', stroke: '#000', strokeThickness: 2
+                }).setOrigin(0.5).setDepth(5001);
+            });
+
+            // Кнопка START
+            const startBg = this.add.graphics().setDepth(5001);
+            startBg.fillStyle(0x5da8ff, 1);
+            startBg.fillRoundedRect(150, 660, 300, 70, 20);
+            startBg.fillStyle(0xffffff, 0.15);
+            startBg.fillRoundedRect(156, 665, 288, 32, 14);
+            this.add.text(300, 695, 'TAP TO PLAY', {
+                fontSize: '26px', fontStyle: 'bold', color: '#fff',
+                stroke: '#1a5fa8', strokeThickness: 3
+            }).setOrigin(0.5).setDepth(5002);
+
+            this.add.zone(300, 695, 300, 70).setInteractive().setDepth(5003)
+                .on('pointerup', () => {
+                    ov.destroy();
+                    this.children.list
+                        .filter(c => c.depth === 5001 || c.depth === 5002 || c.depth === 5003)
+                        .forEach(c => c.destroy());
+                    this.gameStarted = true;
+                });
 
             // 5. Глобальный слушатель Drag & Drop
             this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
@@ -222,7 +266,7 @@
             });
 
             this.input.on('dragend', (pointer, gameObject) => {
-                if (this.gameOver) { returnToOrigin(gameObject); return; }
+                if (!this.gameStarted || this.gameOver) { returnToOrigin(gameObject); return; }
                 const relX = gameObject.x - OFFSET_X;
                 const relY = gameObject.y - OFFSET_Y;
 
