@@ -176,37 +176,71 @@
                 }
             });
 
-            // 4. Глобальный слушатель Drag & Drop
+            // 4. Таймер: авто-спавн каждые 3.5 секунд
+            const SPAWN_DELAY = 3500;
+            const barX = 50, barY = 660, barW = 500, barH = 14;
+
+            // Фон полосы
+            const barBg = this.add.graphics();
+            barBg.fillStyle(0x2a2a35, 1);
+            barBg.fillRoundedRect(barX, barY, barW, barH, 7);
+            this.add.text(300, barY - 22, 'Новое здание через:', {
+                fontSize: '14px', color: '#888', fontStyle: 'bold'
+            }).setOrigin(0.5);
+
+            // Заполняющаяся полоса
+            this.timerFill = this.add.graphics();
+
+            const self = this;
+            const startTimer = () => {
+                self.timerFill.clear();
+                if (self.spawnTween) self.spawnTween.stop();
+                const prog = { v: 0 };
+                self.spawnTween = self.tweens.add({
+                    targets: prog, v: 1,
+                    duration: SPAWN_DELAY, ease: 'Linear',
+                    onUpdate: () => {
+                        if (self.gameOver) return;
+                        self.timerFill.clear();
+                        const color = prog.v > 0.75 ? 0xe06c75 : (prog.v > 0.45 ? 0xe5c07b : 0x98c379);
+                        self.timerFill.fillStyle(color, 1);
+                        self.timerFill.fillRoundedRect(barX, barY, barW * prog.v, barH, 7);
+                    },
+                    onComplete: () => {
+                        if (self.gameOver) return;
+                        autoSpawn(self);
+                        startTimer();
+                    }
+                });
+            };
+            this.startTimer = startTimer;
+            startTimer();
+
+            // 5. Глобальный слушатель Drag & Drop
             this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
                 gameObject.x = dragX;
                 gameObject.y = dragY;
-                gameObject.setDepth(1000); // При поднятии объект рисуется поверх всего
+                gameObject.setDepth(1000);
             });
 
             this.input.on('dragend', (pointer, gameObject) => {
                 if (this.gameOver) { returnToOrigin(gameObject); return; }
-                // Перевод экранных координат обратно в координаты сетки (Inverse Math)
                 const relX = gameObject.x - OFFSET_X;
                 const relY = gameObject.y - OFFSET_Y;
 
                 let gridX = Math.round((relX / (TILE_W / 2) + relY / (TILE_H / 2)) / 2);
                 let gridY = Math.round((relY / (TILE_H / 2) - relX / (TILE_W / 2)) / 2);
 
-                // Проверка границ сетки
                 if (gridX >= 0 && gridX < gridSize && gridY >= 0 && gridY < gridSize) {
                     const targetCell = this.grid[gridX][gridY];
-
-                    // Если клетка пустая — перемещаем туда
                     if (targetCell.empty) {
                         moveItemTo(this, gameObject, gridX, gridY);
-                    }
-                    // Если клетка занята объектом такого же уровня — СЛИЯНИЕ (Merge)
-                    else if (targetCell.item !== gameObject && targetCell.item.level === gameObject.level) {
+                    } else if (targetCell.item !== gameObject && targetCell.item.level === gameObject.level) {
                         mergeItems(this, gameObject, targetCell.item, gridX, gridY);
+                        // Мерси даёт бонус: сбрасываем таймер и начинаем заново
+                        if (!this.gameOver) this.startTimer();
                         if (!this.gameOver) this.tweens.delayedCall(300, () => checkLose(this));
-                    }
-                    // Иначе возвращаем на исходную
-                    else {
+                    } else {
                         returnToOrigin(gameObject);
                     }
                 } else {
@@ -308,6 +342,21 @@
                 duration: 900, ease: 'Power2',
                 onComplete: () => plusText.destroy()
             });
+        }
+
+        function autoSpawn(scene) {
+            if (scene.gameOver) return;
+            const empty = [];
+            for (let x = 0; x < scene.gridSize; x++)
+                for (let y = 0; y < scene.gridSize; y++)
+                    if (scene.grid[x][y].empty) empty.push({ x, y });
+            if (empty.length === 0) { checkLose(scene); return; }
+            const cell = Phaser.Math.RND.pick(empty);
+            const newItem = spawnItem(scene, cell.x, cell.y, 1);
+            newItem.setScale(0);
+            newItem.textObj.setScale(0);
+            scene.tweens.add({ targets: [newItem, newItem.textObj], scaleX: 1, scaleY: 1, duration: 200, ease: 'Back.Out' });
+            scene.tweens.delayedCall(260, () => checkLose(scene));
         }
 
         function returnToOrigin(item) {
