@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Isometric Merge - Playable Ad</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: #1a1a24;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+    </style>
+</head>
+
+<body>
+    <script>
+        const TILE_W = 100;
+        const TILE_H = 50;
+        const OFFSET_X = 300;
+        const OFFSET_Y = 200;
+
+        const config = {
+            type: Phaser.AUTO,
+            width: 600,
+            height: 800,
+            backgroundColor: '#1a1a24',
+            scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+            scene: { create: create }
+        };
+
+        new Phaser.Game(config);
+
+        function getIsoPos(x, y) {
+            return {
+                x: (x - y) * (TILE_W / 2) + OFFSET_X,
+                y: (x + y) * (TILE_H / 2) + OFFSET_Y
+            };
+        }
+
+        function create() {
+            this.grid = [];
+            this.score = 0;
+            const gridSize = 3;
+
+            // --- Score UI ---
+            const scoreCardX = 300, scoreCardY = 390;
+            const scoreBg = this.add.graphics();
+            scoreBg.fillStyle(0x000000, 0.35);
+            scoreBg.fillRoundedRect(scoreCardX - 110, scoreCardY - 30, 220, 60, 14);
+            scoreBg.lineStyle(1.5, 0x5da8ff, 0.4);
+            scoreBg.strokeRoundedRect(scoreCardX - 110, scoreCardY - 30, 220, 60, 14);
+
+            this.add.text(scoreCardX, scoreCardY - 14, 'SCORE', {
+                fontSize: '11px', fontStyle: 'bold', color: '#5da8ff',
+                letterSpacing: 3
+            }).setOrigin(0.5);
+
+            this.scoreText = this.add.text(scoreCardX, scoreCardY + 10, '0', {
+                fontSize: '26px', fontStyle: 'bold', color: '#ffffff',
+                shadow: { offsetX: 0, offsetY: 2, color: '#5da8ff', blur: 8, fill: true }
+            }).setOrigin(0.5);
+
+            // 1. Отрисовка изометрической сетки (земля)
+            for (let x = 0; x < gridSize; x++) {
+                this.grid[x] = [];
+                for (let y = 0; y < gridSize; y++) {
+                    const pos = getIsoPos(x, y);
+
+                    const tile = this.add.graphics();
+                    tile.lineStyle(2, 0x3a3a4f, 1);
+                    tile.fillStyle(0x2a2a35, 1);
+                    tile.beginPath();
+                    tile.moveTo(pos.x, pos.y - TILE_H / 2);
+                    tile.lineTo(pos.x + TILE_W / 2, pos.y);
+                    tile.lineTo(pos.x, pos.y + TILE_H / 2);
+                    tile.lineTo(pos.x - TILE_W / 2, pos.y);
+                    tile.closePath();
+                    tile.fillPath();
+                    tile.strokePath();
+
+                    // Массив логики: кто сейчас стоит на этой клетке
+                    this.grid[x][y] = { empty: true, item: null };
+                }
+            }
+
+            // 2. Создание стартовых предметов
+            spawnItem(this, 0, 0, 1); // Уровень 1
+            spawnItem(this, 1, 1, 1); // Уровень 1
+            spawnItem(this, 2, 0, 2); // Уровень 2
+
+            // 3. Кнопка «Добавить здание»
+            const btnW = 200, btnH = 56;
+            const btnX = 300, btnY = 530;
+
+            const btnBg = this.add.graphics();
+            function drawBtn(pressed) {
+                btnBg.clear();
+                // Тень
+                btnBg.fillStyle(0x000000, 0.3);
+                btnBg.fillRoundedRect(btnX - btnW / 2 + 4, btnY - btnH / 2 + 6, btnW, btnH, 16);
+                // Основной фон
+                const topColor = pressed ? 0x3a80d2 : 0x5da8ff;
+                btnBg.fillStyle(topColor, 1);
+                btnBg.fillRoundedRect(btnX - btnW / 2, btnY - btnH / 2, btnW, btnH, 16);
+                // Блик
+                btnBg.fillStyle(0xffffff, pressed ? 0.05 : 0.15);
+                btnBg.fillRoundedRect(btnX - btnW / 2 + 6, btnY - btnH / 2 + 4, btnW - 12, btnH / 2 - 4, 10);
+            }
+            drawBtn(false);
+
+            // Тёмный оверлей для плавного затемнения при hover
+            const btnOverlay = this.add.graphics().setDepth(9);
+            btnOverlay.fillStyle(0x000000, 1);
+            btnOverlay.fillRoundedRect(btnX - btnW / 2, btnY - btnH / 2, btnW, btnH, 16);
+            btnOverlay.setAlpha(0);
+
+            const btnText = this.add.text(btnX, btnY, '+ Добавить здание', {
+                fontSize: '18px',
+                fontStyle: 'bold',
+                color: '#ffffff',
+                stroke: '#1a5fa8',
+                strokeThickness: 3,
+                shadow: { offsetX: 0, offsetY: 2, color: '#000', blur: 4, fill: true }
+            }).setOrigin(0.5).setDepth(10);
+
+            // Невидимая интерактивная зона над кнопкой
+            const btnZone = this.add.zone(btnX, btnY, btnW, btnH).setInteractive().setDepth(11);
+
+            btnZone.on('pointerover', () => {
+                this.tweens.add({ targets: btnOverlay, alpha: 0.18, duration: 150, ease: 'Power2' });
+            });
+            btnZone.on('pointerout', () => {
+                drawBtn(false);
+                this.tweens.add({ targets: btnOverlay, alpha: 0, duration: 150, ease: 'Power2' });
+            });
+            btnZone.on('pointerdown', () => { drawBtn(true); btnOverlay.setAlpha(0); });
+            btnZone.on('pointerup', () => {
+                drawBtn(false);
+                this.tweens.add({ targets: btnOverlay, alpha: 0.18, duration: 150, ease: 'Power2' });
+
+                // Найти первую свободную клетку (обход по строкам)
+                let placed = false;
+                for (let x = 0; x < gridSize && !placed; x++) {
+                    for (let y = 0; y < gridSize && !placed; y++) {
+                        if (this.grid[x][y].empty) {
+                            const newItem = spawnItem(this, x, y, 1);
+                            // Анимация появления
+                            newItem.setScale(0);
+                            newItem.textObj.setScale(0);
+                            this.tweens.add({
+                                targets: [newItem, newItem.textObj],
+                                scaleX: 1, scaleY: 1,
+                                duration: 200, ease: 'Back.Out'
+                            });
+                            placed = true;
+                        }
+                    }
+                }
+                if (!placed) {
+                    // Если сетка полная — потряхиваем кнопку
+                    this.tweens.add({
+                        targets: [btnBg, btnText],
+                        x: '+=6', duration: 50, yoyo: true, repeat: 3, ease: 'Power1',
+                        onComplete: () => { btnBg.x = 0; btnText.x = btnX; }
+                    });
+                }
+            });
+
+            // 4. Глобальный слушатель Drag & Drop
+            this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
+                gameObject.x = dragX;
+                gameObject.y = dragY;
+                gameObject.setDepth(1000); // При поднятии объект рисуется поверх всего
+            });
+
+            this.input.on('dragend', (pointer, gameObject) => {
+                // Перевод экранных координат обратно в координаты сетки (Inverse Math)
+                const relX = gameObject.x - OFFSET_X;
+                const relY = gameObject.y - OFFSET_Y;
+
+                let gridX = Math.round((relX / (TILE_W / 2) + relY / (TILE_H / 2)) / 2);
+                let gridY = Math.round((relY / (TILE_H / 2) - relX / (TILE_W / 2)) / 2);
+
+                // Проверка границ сетки
+                if (gridX >= 0 && gridX < gridSize && gridY >= 0 && gridY < gridSize) {
+                    const targetCell = this.grid[gridX][gridY];
+
+                    // Если клетка пустая — перемещаем туда
+                    if (targetCell.empty) {
+                        moveItemTo(this, gameObject, gridX, gridY);
+                    }
+                    // Если клетка занята объектом такого же уровня — СЛИЯНИЕ (Merge)
+                    else if (targetCell.item !== gameObject && targetCell.item.level === gameObject.level) {
+                        mergeItems(this, gameObject, targetCell.item, gridX, gridY);
+                    }
+                    // Иначе возвращаем на исходную
+                    else {
+                        returnToOrigin(gameObject);
+                    }
+                } else {
+                    returnToOrigin(gameObject);
+                }
+            });
+        }
+
+        function spawnItem(scene, gridX, gridY, level) {
+            const pos = getIsoPos(gridX, gridY);
+            const palette = [0xe06c75, 0x98c379, 0x61afef, 0xe5c07b, 0xc678dd, 0x56b6c2, 0xff9f43, 0xee5a24, 0x0652DD, 0x1289A7];
+            const color = palette[(level - 1) % palette.length];
+
+            // Создаем "квадрат", который будет выступать предметом
+            const item = scene.add.rectangle(pos.x, pos.y - 15, 40, 40, color).setInteractive({ draggable: true });
+            item.gridX = gridX;
+            item.gridY = gridY;
+            item.level = level;
+
+            // Сортировка глубины: чем больше X+Y, тем ближе к камере
+            item.setDepth(gridX + gridY);
+
+            // Текст значения (2^level)
+            const value = Math.pow(2, level);
+            item.textObj = scene.add.text(pos.x, pos.y - 15, value, {
+                fontSize: value >= 1000 ? '14px' : '20px',
+                fontStyle: 'bold',
+                color: '#ffffff',
+                stroke: '#000000',
+                strokeThickness: 2
+            }).setOrigin(0.5).setDepth(item.depth + 1);
+
+            // Добавляем апдейт позиции для текста при перетаскивании
+            item.on('drag', () => {
+                item.textObj.x = item.x;
+                item.textObj.y = item.y;
+                item.textObj.setDepth(1001);
+            });
+
+            scene.grid[gridX][gridY] = { empty: false, item: item };
+            return item;
+        }
+
+        function moveItemTo(scene, item, gridX, gridY) {
+            scene.grid[item.gridX][item.gridY] = { empty: true, item: null }; // Освобождаем старую
+
+            item.gridX = gridX;
+            item.gridY = gridY;
+
+            scene.grid[gridX][gridY] = { empty: false, item: item }; // Занимаем новую
+
+            const pos = getIsoPos(gridX, gridY);
+            item.setPosition(pos.x, pos.y - 15);
+            item.textObj.setPosition(pos.x, pos.y - 15);
+
+            item.setDepth(gridX + gridY);
+            item.textObj.setDepth(gridX + gridY + 1);
+        }
+
+        function mergeItems(scene, sourceItem, targetItem, gridX, gridY) {
+            const nextLevel = targetItem.level + 1;
+            const mergeValue = Math.pow(2, nextLevel);
+
+            // Уничтожаем старые объекты
+            sourceItem.textObj.destroy();
+            sourceItem.destroy();
+            targetItem.textObj.destroy();
+            targetItem.destroy();
+            scene.grid[sourceItem.gridX][sourceItem.gridY] = { empty: true, item: null };
+
+            // Создаем объект нового уровня
+            const newItem = spawnItem(scene, gridX, gridY, nextLevel);
+
+            // Анимация успешного слияния (Scale bounce)
+            scene.tweens.add({
+                targets: [newItem, newItem.textObj],
+                scaleX: 1.3, scaleY: 1.3,
+                duration: 150, yoyo: true
+            });
+
+            // Обновляем счёт
+            scene.score += mergeValue;
+            scene.scoreText.setText(scene.score);
+
+            // Анимация +N
+            const pos = getIsoPos(gridX, gridY);
+            const plusText = scene.add.text(pos.x, pos.y - 40, '+' + mergeValue, {
+                fontSize: '20px', fontStyle: 'bold', color: '#f9e44a',
+                stroke: '#000', strokeThickness: 3
+            }).setOrigin(0.5).setDepth(2000);
+            scene.tweens.add({
+                targets: plusText,
+                y: pos.y - 90, alpha: 0,
+                duration: 900, ease: 'Power2',
+                onComplete: () => plusText.destroy()
+            });
+        }
+
+        function returnToOrigin(item) {
+            const pos = getIsoPos(item.gridX, item.gridY);
+            item.setPosition(pos.x, pos.y - 15);
+            item.textObj.setPosition(pos.x, pos.y - 15);
+            item.setDepth(item.gridX + item.gridY);
+            item.textObj.setDepth(item.gridX + item.gridY + 1);
+        }
+    </script>
+</body>
+
+</html>
