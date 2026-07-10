@@ -297,9 +297,7 @@
             const color = palette[(level - 1) % palette.length];
 
             // Создаем "квадрат", который будет выступать предметом
-            const item = scene.add.rectangle(pos.x, pos.y - 22, 62, 62, color);
-            item.setInteractive(new Phaser.Geom.Rectangle(-55, -55, 110, 110), Phaser.Geom.Rectangle.Contains);
-            scene.input.setDraggable(item);
+            const item = scene.add.rectangle(pos.x, pos.y - 22, 62, 62, color).setInteractive({ draggable: true });
             item.gridX = gridX;
             item.gridY = gridY;
             item.level = level;
