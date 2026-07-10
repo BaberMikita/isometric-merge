@@ -190,31 +190,29 @@
 
             // Заполняющаяся полоса
             this.timerFill = this.add.graphics();
+            this.timerElapsed = 0;
 
-            const self = this;
-            const startTimer = () => {
-                self.timerFill.clear();
-                if (self.spawnTween) self.spawnTween.stop();
-                self.spawnTween = self.tweens.addCounter({
-                    from: 0, to: 1,
-                    duration: SPAWN_DELAY, ease: 'Linear',
-                    onUpdate: (tween) => {
-                        if (self.gameOver) return;
-                        const v = tween.getValue();
-                        self.timerFill.clear();
-                        const color = v > 0.75 ? 0xe06c75 : (v > 0.45 ? 0xe5c07b : 0x98c379);
-                        self.timerFill.fillStyle(color, 1);
-                        self.timerFill.fillRoundedRect(barX, barY, barW * v, barH, 7);
-                    },
-                    onComplete: () => {
-                        if (self.gameOver) return;
-                        autoSpawn(self);
-                        startTimer();
+            // Сброс таймера (вызывается после слияния)
+            this.startTimer = () => { this.timerElapsed = 0; };
+
+            // Обновление каждые 50мс — надёжный подход вместо tween
+            this.time.addEvent({
+                delay: 50,
+                loop: true,
+                callback: () => {
+                    if (this.gameOver) return;
+                    this.timerElapsed += 50;
+                    const v = Math.min(this.timerElapsed / SPAWN_DELAY, 1);
+                    this.timerFill.clear();
+                    const color = v > 0.75 ? 0xe06c75 : (v > 0.45 ? 0xe5c07b : 0x98c379);
+                    this.timerFill.fillStyle(color, 1);
+                    this.timerFill.fillRoundedRect(barX, barY, barW * v, barH, 7);
+                    if (this.timerElapsed >= SPAWN_DELAY) {
+                        this.timerElapsed = 0;
+                        autoSpawn(this);
                     }
-                });
-            };
-            this.startTimer = startTimer;
-            startTimer();
+                }
+            });
 
             // 5. Глобальный слушатель Drag & Drop
             this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
