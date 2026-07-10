@@ -44,26 +44,29 @@
 
         function create() {
             this.grid = [];
-            this.score = 0;
+            this.gameOver = false;
+            this.bestValue = 2;
             const gridSize = 3;
+            this.gridSize = gridSize;
 
             // --- Score UI ---
-            const scoreCardX = 300, scoreCardY = 460;
-            const scoreBg = this.add.graphics();
-            scoreBg.fillStyle(0x000000, 0.35);
-            scoreBg.fillRoundedRect(scoreCardX - 130, scoreCardY - 36, 260, 72, 18);
-            scoreBg.lineStyle(2, 0x5da8ff, 0.5);
-            scoreBg.strokeRoundedRect(scoreCardX - 130, scoreCardY - 36, 260, 72, 18);
-
-            this.add.text(scoreCardX, scoreCardY - 16, 'SCORE', {
-                fontSize: '14px', fontStyle: 'bold', color: '#5da8ff',
-                letterSpacing: 4
-            }).setOrigin(0.5);
-
-            this.scoreText = this.add.text(scoreCardX, scoreCardY + 14, '0', {
-                fontSize: '34px', fontStyle: 'bold', color: '#ffffff',
-                shadow: { offsetX: 0, offsetY: 2, color: '#5da8ff', blur: 8, fill: true }
-            }).setOrigin(0.5);
+            const panelY = 460;
+            // Левая карточка: ЛУЧШИЙ
+            const leftBg = this.add.graphics();
+            leftBg.fillStyle(0x000000, 0.35);
+            leftBg.fillRoundedRect(90, panelY - 36, 160, 72, 16);
+            leftBg.lineStyle(2, 0x5da8ff, 0.4);
+            leftBg.strokeRoundedRect(90, panelY - 36, 160, 72, 16);
+            this.add.text(170, panelY - 16, 'ЛУЧШИЙ', { fontSize: '13px', fontStyle: 'bold', color: '#5da8ff', letterSpacing: 2 }).setOrigin(0.5);
+            this.bestText = this.add.text(170, panelY + 14, '2', { fontSize: '34px', fontStyle: 'bold', color: '#fff', shadow: { offsetX: 0, offsetY: 2, color: '#5da8ff', blur: 8, fill: true } }).setOrigin(0.5);
+            // Правая карточка: ЦЕЛЬ 32
+            const rightBg = this.add.graphics();
+            rightBg.fillStyle(0x1a1000, 0.7);
+            rightBg.fillRoundedRect(350, panelY - 36, 160, 72, 16);
+            rightBg.lineStyle(2, 0xf9e44a, 0.7);
+            rightBg.strokeRoundedRect(350, panelY - 36, 160, 72, 16);
+            this.add.text(430, panelY - 16, 'ЦЕЛЬ', { fontSize: '13px', fontStyle: 'bold', color: '#f9e44a', letterSpacing: 2 }).setOrigin(0.5);
+            this.add.text(430, panelY + 14, '32', { fontSize: '34px', fontStyle: 'bold', color: '#f9e44a', shadow: { offsetX: 0, offsetY: 2, color: '#f9a500', blur: 10, fill: true } }).setOrigin(0.5);
 
             // 1. Отрисовка изометрической сетки (земля)
             for (let x = 0; x < gridSize; x++) {
@@ -140,6 +143,7 @@
             });
             btnZone.on('pointerdown', () => { drawBtn(true); btnOverlay.setAlpha(0); });
             btnZone.on('pointerup', () => {
+                if (this.gameOver) return;
                 drawBtn(false);
                 this.tweens.add({ targets: btnOverlay, alpha: 0.18, duration: 150, ease: 'Power2' });
 
@@ -158,6 +162,7 @@
                                 duration: 200, ease: 'Back.Out'
                             });
                             placed = true;
+                            this.tweens.delayedCall(260, () => checkLose(this));
                         }
                     }
                 }
@@ -179,6 +184,7 @@
             });
 
             this.input.on('dragend', (pointer, gameObject) => {
+                if (this.gameOver) { returnToOrigin(gameObject); return; }
                 // Перевод экранных координат обратно в координаты сетки (Inverse Math)
                 const relX = gameObject.x - OFFSET_X;
                 const relY = gameObject.y - OFFSET_Y;
@@ -197,6 +203,7 @@
                     // Если клетка занята объектом такого же уровня — СЛИЯНИЕ (Merge)
                     else if (targetCell.item !== gameObject && targetCell.item.level === gameObject.level) {
                         mergeItems(this, gameObject, targetCell.item, gridX, gridY);
+                        if (!this.gameOver) this.tweens.delayedCall(300, () => checkLose(this));
                     }
                     // Иначе возвращаем на исходную
                     else {
@@ -281,9 +288,13 @@
                 duration: 150, yoyo: true
             });
 
-            // Обновляем счёт
-            scene.score += mergeValue;
-            scene.scoreText.setText(scene.score);
+            // Обновляем лучшее значение
+            if (mergeValue > scene.bestValue) {
+                scene.bestValue = mergeValue;
+                scene.bestText.setText(mergeValue);
+            }
+            // Проверяем победу (32 = уровень 5)
+            if (nextLevel === 5) { showWin(scene); return; }
 
             // Анимация +N
             const pos = getIsoPos(gridX, gridY);
@@ -305,6 +316,64 @@
             item.textObj.setPosition(pos.x, pos.y - 22);
             item.setDepth(item.gridX + item.gridY);
             item.textObj.setDepth(item.gridX + item.gridY + 1);
+        }
+
+        function checkLose(scene) {
+            if (scene.gameOver) return;
+            const gs = scene.gridSize;
+            for (let x = 0; x < gs; x++)
+                for (let y = 0; y < gs; y++)
+                    if (scene.grid[x][y].empty) return;
+            // Полная сетка — проверяем возможные слияния
+            for (let x = 0; x < gs; x++) {
+                for (let y = 0; y < gs; y++) {
+                    const lvl = scene.grid[x][y].item.level;
+                    if (x + 1 < gs && scene.grid[x+1][y].item.level === lvl) return;
+                    if (y + 1 < gs && scene.grid[x][y+1].item.level === lvl) return;
+                }
+            }
+            showLose(scene);
+        }
+
+        function showWin(scene) {
+            if (scene.gameOver) return;
+            scene.gameOver = true;
+            const ov = scene.add.graphics().setDepth(3000);
+            ov.fillStyle(0x000000, 0.75); ov.fillRect(0, 0, 600, 800);
+            scene.add.text(300, 260, '🏆', { fontSize: '100px' }).setOrigin(0.5).setDepth(3001);
+            scene.add.text(300, 390, 'ВЫ ПОБЕДИЛИ!', {
+                fontSize: '42px', fontStyle: 'bold', color: '#f9e44a', stroke: '#000', strokeThickness: 5
+            }).setOrigin(0.5).setDepth(3001);
+            scene.add.text(300, 450, 'Собрано здание 32!', {
+                fontSize: '22px', color: '#fff', stroke: '#000', strokeThickness: 3
+            }).setOrigin(0.5).setDepth(3001);
+            drawResultBtn(scene, 300, 560, 'Играть снова', 0x5da8ff, () => scene.scene.restart());
+        }
+
+        function showLose(scene) {
+            if (scene.gameOver) return;
+            scene.gameOver = true;
+            const ov = scene.add.graphics().setDepth(3000);
+            ov.fillStyle(0x000000, 0.78); ov.fillRect(0, 0, 600, 800);
+            scene.add.text(300, 260, '💥', { fontSize: '100px' }).setOrigin(0.5).setDepth(3001);
+            scene.add.text(300, 390, 'ИГРА ОКОНЧЕНА', {
+                fontSize: '40px', fontStyle: 'bold', color: '#e06c75', stroke: '#000', strokeThickness: 5
+            }).setOrigin(0.5).setDepth(3001);
+            scene.add.text(300, 450, 'Нет доступных ходов!', {
+                fontSize: '22px', color: '#fff', stroke: '#000', strokeThickness: 3
+            }).setOrigin(0.5).setDepth(3001);
+            drawResultBtn(scene, 300, 560, 'Попробовать снова', 0x5da8ff, () => scene.scene.restart());
+        }
+
+        function drawResultBtn(scene, x, y, label, color, callback) {
+            const bw = 280, bh = 68;
+            const bg = scene.add.graphics().setDepth(3002);
+            bg.fillStyle(color, 1);
+            bg.fillRoundedRect(x - bw/2, y - bh/2, bw, bh, 18);
+            bg.fillStyle(0xffffff, 0.15);
+            bg.fillRoundedRect(x - bw/2 + 6, y - bh/2 + 4, bw - 12, bh/2 - 4, 12);
+            scene.add.text(x, y, label, { fontSize: '24px', fontStyle: 'bold', color: '#fff', stroke: '#1a5fa8', strokeThickness: 3 }).setOrigin(0.5).setDepth(3003);
+            scene.add.zone(x, y, bw, bh).setInteractive().setDepth(3004).on('pointerup', callback);
         }
     </script>
 </body>
